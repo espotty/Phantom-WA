@@ -167,9 +167,9 @@
 
 		NSBundle *prefBundle = [NSBundle bundleForClass: self.class];
 
-		NSString *applyLabelText = [prefBundle localizedStringForKey: @"AXApplyLabel" value: @"" table: nil];
-		NSString *yesButtonTitle = [prefBundle localizedStringForKey: @"AXApplyYes" value: @"" table: nil];
-		NSString *noButtonTitle = [prefBundle localizedStringForKey: @"AXApplyNo" value: @"" table: nil];
+		NSString *applyLabelText = [prefBundle localizedStringForKey: @"PHApplyLabel" value: @"Restart WhatsApp?" table: nil];
+		NSString *yesButtonTitle = [prefBundle localizedStringForKey: @"PHApplyYes" value: @"Apply" table: nil];
+		NSString *noButtonTitle = [prefBundle localizedStringForKey: @"PHApplyNo" value: @"Cancel" table: nil];
 
 		self.popController = [[UIViewController alloc] init];
 

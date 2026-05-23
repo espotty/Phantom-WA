@@ -2,21 +2,31 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>AXDebugFooter</key>
-	<string>Enable logging of status messages with NSLog.</string>
-	<key>AXDebugLabel</key>
-	<string>Debug Logging</string>
-	<key>AXDebugSwitch</key>
-	<string>Debug Logging</string>
-	<key>AXEnableLabel</key>
-	<string>Enable</string>
-	<key>AXEnableSwitch</key>
+	<key>PHEnableLabel</key>
+	<string>Tweak</string>
+	<key>PHEnableSwitch</key>
 	<string>Enable Phantom</string>
-	<key>AXSocialLabel</key>
-	<string>Links</string>
-	<key>AXVersionFooter</key>
-	<string>Set the WhatsApp version to spoof. The MD5 build hash will be calculated automatically when WhatsApp restarts after applying.</string>
-	<key>AXVersionLabel</key>
+	<key>PHVersionLabel</key>
+	<string>Version Spoof</string>
+	<key>PHVersionFooter</key>
+	<string>Set the WhatsApp version to report to servers. Tap Apply (✓) then restart WhatsApp. If a new update drops, enter the latest version number here.</string>
+	<key>PHVersionFieldLabel</key>
 	<string>Spoof Version</string>
+	<key>PHDebugLabel</key>
+	<string>Developer</string>
+	<key>PHDebugFooter</key>
+	<string>Enables detailed NSLog output for troubleshooting.</string>
+	<key>PHDebugSwitch</key>
+	<string>Debug Logging</string>
+	<key>PHContactLabel</key>
+	<string>Contact</string>
+	<key>PHChannelTitle</key>
+	<string>Telegram Channel</string>
+	<key>PHChannelSubtitle</key>
+	<string>@spottsee</string>
+	<key>PHDeveloperTitle</key>
+	<string>Developer</string>
+	<key>PHDeveloperSubtitle</key>
+	<string>@ispott</string>
 </dict>
 </plist>

@@ -4,11 +4,13 @@
 <dict>
 	<key>items</key>
 	<array>
+
+		<!-- ── Enable ── -->
 		<dict>
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>label</key>
-			<string>AXEnableLabel</string>
+			<string>PHEnableLabel</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -22,15 +24,17 @@
 			<key>key</key>
 			<string>enabled</string>
 			<key>label</key>
-			<string>AXEnableSwitch</string>
+			<string>PHEnableSwitch</string>
 		</dict>
+
+		<!-- ── Version Spoof ── -->
 		<dict>
 			<key>cell</key>
 			<string>PSGroupCell</string>
-			<key>footerText</key>
-			<string>AXVersionFooter</string>
 			<key>label</key>
-			<string>AXVersionLabel</string>
+			<string>PHVersionLabel</string>
+			<key>footerText</key>
+			<string>PHVersionFooter</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -39,22 +43,24 @@
 			<string>25.1.83.0</string>
 			<key>defaults</key>
 			<string>com.macthemes.phantomprefs</string>
-			<key>isIP</key>
-			<true/>
 			<key>key</key>
 			<string>newVersion</string>
+			<key>label</key>
+			<string>PHVersionFieldLabel</string>
 			<key>noAutoCorrect</key>
 			<true/>
 			<key>placeholder</key>
-			<string>25.1.83.0</string>
+			<string>e.g. 25.1.83.0</string>
 		</dict>
+
+		<!-- ── Debug ── -->
 		<dict>
 			<key>cell</key>
 			<string>PSGroupCell</string>
-			<key>footerText</key>
-			<string>AXDebugFooter</string>
 			<key>label</key>
-			<string>AXDebugLabel</string>
+			<string>PHDebugLabel</string>
+			<key>footerText</key>
+			<string>PHDebugFooter</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -68,13 +74,15 @@
 			<key>key</key>
 			<string>debugLogging</string>
 			<key>label</key>
-			<string>AXDebugSwitch</string>
+			<string>PHDebugSwitch</string>
 		</dict>
+
+		<!-- ── Contact ── -->
 		<dict>
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>label</key>
-			<string>AXSocialLabel</string>
+			<string>PHContactLabel</string>
 		</dict>
 		<dict>
 			<key>action</key>
@@ -84,24 +92,45 @@
 			<key>cellClass</key>
 			<string>MTContactCell</string>
 			<key>height</key>
-			<real>70</real>
+			<real>60</real>
 			<key>image</key>
-			<string>github.png</string>
+			<string>telegram.png</string>
 			<key>subTitle</key>
-			<string>AXSocialSourceSubTitle</string>
+			<string>PHChannelSubtitle</string>
 			<key>title</key>
-			<string>AXSocialSourceTitle</string>
+			<string>PHChannelTitle</string>
 			<key>url</key>
-			<string>https://github.com/espotty/Axolotl-fixed</string>
+			<string>https://t.me/spottsee</string>
 		</dict>
+		<dict>
+			<key>action</key>
+			<string>open:</string>
+			<key>cell</key>
+			<string>PSButtonCell</string>
+			<key>cellClass</key>
+			<string>MTContactCell</string>
+			<key>height</key>
+			<real>60</real>
+			<key>image</key>
+			<string>telegram.png</string>
+			<key>subTitle</key>
+			<string>PHDeveloperSubtitle</string>
+			<key>title</key>
+			<string>PHDeveloperTitle</string>
+			<key>url</key>
+			<string>https://t.me/ispott</string>
+		</dict>
+
+		<!-- ── Footer ── -->
 		<dict>
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>footerAlignment</key>
 			<integer>1</integer>
 			<key>footerText</key>
-			<string>Phantom for WhatsApp</string>
+			<string>Phantom for WhatsApp · by espotty</string>
 		</dict>
+
 	</array>
 	<key>title</key>
 	<string></string>
