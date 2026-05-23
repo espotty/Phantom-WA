@@ -16,7 +16,7 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = Phantom
 Phantom_FILES = Tweak.xm
-Phantom_CFLAGS = -fobjc-arc -std=c++11
+Phantom_CFLAGS = -fobjc-arc -std=c++11 -Wno-deprecated-declarations
 
 include $(THEOS)/makefiles/tweak.mk
 
