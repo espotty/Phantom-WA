@@ -70,16 +70,6 @@ static int name_match(const char *sym, const char *target) {
     return *sym == '\0';
 }
 
-static int str_contains(const char *s, const char *sub) {
-    if (!s || !sub) return 0;
-    for (; *s; s++) {
-        const char *a = s, *b = sub;
-        while (*b && *a == *b) { a++; b++; }
-        if (!*b) return 1;
-    }
-    return 0;
-}
-
 // ── Mach-O GOT rebinding ─────────────────────────────────────────────────────
 
 static void rebind_imports_in_image(const struct mach_header_64 *header, intptr_t slide) {
@@ -190,25 +180,18 @@ static void rebind_imports_in_image(const struct mach_header_64 *header, intptr_
     }
 }
 
-static void hook_c_functions_got(void) {
-    uint32_t count = _dyld_image_count();
-    for (uint32_t i = 0; i < count; i++) {
-        const char *name = _dyld_get_image_name(i);
-        if (!name) continue;
-        if (!str_contains(name, "SharedModules") &&
-            !str_contains(name, "WhatsApp.app/WhatsApp"))
-            continue;
-
-        const struct mach_header_64 *hdr =
-            (const struct mach_header_64 *)_dyld_get_image_header(i);
-        intptr_t slide = _dyld_get_image_vmaddr_slide(i);
-        rebind_imports_in_image(hdr, slide);
-    }
+// Called by dyld for every image — both already-loaded and future ones.
+// Using _dyld_register_func_for_add_image ensures we catch SharedModules
+// even if it loads after our constructor runs (DYLD_INSERT_LIBRARIES order).
+static void on_image_added(const struct mach_header *mh, intptr_t slide) {
+    rebind_imports_in_image((const struct mach_header_64 *)mh, slide);
 }
 
 // ── Public entry point ────────────────────────────────────────────────────────
 
 void wa_got_hook_apply(void) {
     g_futureDate = [NSDate dateWithTimeIntervalSinceNow: 315360000.0];
-    hook_c_functions_got();
+    // Registers callback for all currently-loaded images AND any image loaded later.
+    // This guarantees hooks apply to SharedModules regardless of load order.
+    _dyld_register_func_for_add_image(on_image_added);
 }
