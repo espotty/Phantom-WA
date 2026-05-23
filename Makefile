@@ -22,3 +22,12 @@ include $(THEOS)/makefiles/tweak.mk
 
 SUBPROJECTS += Preferences
 include $(THEOS_MAKE_PATH)/aggregate.mk
+
+internal-stage::
+ifeq ($(ROOTLESS),1)
+	@mkdir -p $(THEOS_STAGING_DIR)/var/jb/Library/PreferenceLoader/Preferences
+	@cp Preferences/PhantomPrefs.plist $(THEOS_STAGING_DIR)/var/jb/Library/PreferenceLoader/Preferences/PhantomPrefs.plist
+else
+	@mkdir -p $(THEOS_STAGING_DIR)/Library/PreferenceLoader/Preferences
+	@cp Preferences/PhantomPrefs.plist $(THEOS_STAGING_DIR)/Library/PreferenceLoader/Preferences/PhantomPrefs.plist
+endif
