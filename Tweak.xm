@@ -40,6 +40,10 @@ static NSString * (*_orig_WABuildVersion)(void *, void *);
 static NSString * (*_orig_WABuildHTTPUserAgentString)();
 static int        (*_orig_WAIsAfterDeprecatedPlatformCutoffDate)();
 static void       (*_orig_WAHandleFailureInFunction)();
+static int        (*_orig_WABuildVersionComponent1)();
+static int        (*_orig_WABuildVersionComponent2)();
+static int        (*_orig_WABuildVersionComponent3)();
+static int        (*_orig_WABuildVersionComponent4)();
 
 /*
 	C Function Overrides …
@@ -89,6 +93,12 @@ static void _new_WAHandleFailureInFunction()
 	if (debugLogging) NSLog(@"[Phantom] WAHandleFailureInFunction suppressed");
 }
 
+// Individual version component functions — must be consistent with WABuildVersion.
+static int _new_WABuildVersionComponent1() { return newVersionMajor; }
+static int _new_WABuildVersionComponent2() { return newVersionMinor; }
+static int _new_WABuildVersionComponent3() { return newVersionBuild; }
+static int _new_WABuildVersionComponent4() { return newVersionRevision; }
+
 /*
 	Hooks …
 */
@@ -115,7 +125,6 @@ static void _new_WAHandleFailureInFunction()
 	%end
 
 	// Hook getters (read path) — called when proto is serialized and sent to server.
-	// Hooking setters is not enough; the server reads these getter values directly.
 	%hook WAPBClientPayload_UserAgent_AppVersion
 
 		- (unsigned int)primary    { return (unsigned int)newVersionMajor; }
@@ -129,7 +138,7 @@ static void _new_WAHandleFailureInFunction()
 	// The server rejects iOS 14 connections; spoofing to iOS 17 allows them through.
 	%hook WAPBClientPayload_UserAgent
 
-		- (NSString *)osVersion    { return SPOOF_IOS_VERSION; }
+		- (NSString *)osVersion     { return SPOOF_IOS_VERSION; }
 		- (NSString *)osBuildNumber { return SPOOF_IOS_BUILD; }
 
 	%end
@@ -159,26 +168,19 @@ static void _new_WAHandleFailureInFunction()
 %end
 
 /*
-	Helper …
+	Helper — tries to find a symbol in SharedModules then the main binary.
 */
-static void hookSym(void *image, const char *name, void *replacement, void **orig)
+static void tryHook(void *sharedModules, void *mainBin,
+                    const char *name, void *replacement, void **orig)
 {
-	void *sym = dlsym(image, name);
-
-	if (!sym)
-	{
-		// some symbols are exported with a leading underscore in older frameworks
-		char buf[256];
-		buf[0] = '_';
-		int i = 1;
-		while (name[i - 1] && i < 255) { buf[i] = name[i - 1]; i++; }
-		buf[i] = '\0';
-		sym = dlsym(image, buf);
-	}
+	void *sym = dlsym(sharedModules, name);
+	if (!sym && mainBin) sym = dlsym(mainBin, name);
 
 	if (sym)
 	{
 		MSHookFunction(sym, replacement, orig);
+
+		if (debugLogging) NSLog(@"[Phantom] Hooked: %s", name);
 	}
 	else if (debugLogging)
 	{
@@ -197,72 +199,100 @@ static void hookSym(void *image, const char *name, void *replacement, void **ori
 
 	if (enabled)
 	{
-		debugLogging    = preferences[@"debugLogging"]    ? [preferences[@"debugLogging"] boolValue]    : NO;
+		debugLogging     = preferences[@"debugLogging"]     ? [preferences[@"debugLogging"] boolValue]     : NO;
 		fixNotifications = preferences[@"fixNotifications"] ? [preferences[@"fixNotifications"] boolValue] : NO;
 
 		// Use user-set version or fall back to DEFAULT_VERSION.
-		NSString *userVersion = preferences[@"newVersion"] ? [preferences[@"newVersion"] stringValue] : nil;
-		NSPredicate *isValidVersion = [NSPredicate predicateWithFormat: @"SELF MATCHES %@", @"^\\d+(\\.\\d+){2,3}$"];
+		NSString *userVersion   = preferences[@"newVersion"] ? [preferences[@"newVersion"] stringValue] : nil;
+		NSPredicate *isValid    = [NSPredicate predicateWithFormat: @"SELF MATCHES %@", @"^\\d+(\\.\\d+){2,3}$"];
 
-		if (userVersion && [isValidVersion evaluateWithObject: userVersion])
-			newVersion = userVersion;
-		else
-			newVersion = DEFAULT_VERSION;
+		newVersion = (userVersion && [isValid evaluateWithObject: userVersion]) ? userVersion : DEFAULT_VERSION;
 
 		NSArray *components = [newVersion componentsSeparatedByString: @"."];
-		newVersionMajor   = [components[0] intValue];
-		newVersionMinor   = [components[1] intValue];
-		newVersionBuild   = [components[2] intValue];
+		newVersionMajor    = [components[0] intValue];
+		newVersionMinor    = [components[1] intValue];
+		newVersionBuild    = [components[2] intValue];
 		newVersionRevision = ([components count] > 3) ? [components[3] intValue] : 0;
 
 		spoofedUserAgent = [NSString stringWithFormat: @"WhatsApp/%@ iOS/%@ Device/iPhone14,3",
 		                    newVersion, SPOOF_IOS_VERSION];
 
-		NSString *bundlePath   = [[NSBundle mainBundle] bundlePath];
-		NSString *frameworkPath = [bundlePath stringByAppendingPathComponent: @"Frameworks/SharedModules.framework/SharedModules"];
+		// Open SharedModules framework and the main WhatsApp binary.
+		NSString *bundlePath    = [[NSBundle mainBundle] bundlePath];
+		NSString *frameworkPath = [bundlePath stringByAppendingPathComponent:
+		                           @"Frameworks/SharedModules.framework/SharedModules"];
 
-		void *image = dlopen([frameworkPath UTF8String], RTLD_LAZY);
+		void *sharedModules = dlopen([frameworkPath UTF8String], RTLD_LAZY);
+		void *mainBin       = dlopen(NULL, RTLD_LAZY);
 
 		%init(Phantom);
 
-		if (image)
+		if (sharedModules || mainBin)
 		{
-			hookSym(image, "WAAppExpirationDate",
+			tryHook(sharedModules, mainBin,
+			        "WAAppExpirationDate",
 			        (void *)&_new_WAAppExpirationDate,
 			        (void **)&_orig_WAAppExpirationDate);
 
-			hookSym(image, "WABuildDate",
+			tryHook(sharedModules, mainBin,
+			        "WABuildDate",
 			        (void *)&_new_WABuildDate,
 			        (void **)&_orig_WABuildDate);
 
-			hookSym(image, "WABuildVersion",
+			tryHook(sharedModules, mainBin,
+			        "WABuildVersion",
 			        (void *)&_new_WABuildVersion,
 			        (void **)&_orig_WABuildVersion);
 
 			// Key fix: spoof the HTTP User-Agent so server doesn't see iOS 14
-			hookSym(image, "WABuildHTTPUserAgentString",
+			tryHook(sharedModules, mainBin,
+			        "WABuildHTTPUserAgentString",
 			        (void *)&_new_WABuildHTTPUserAgentString,
 			        (void **)&_orig_WABuildHTTPUserAgentString);
 
-			// Key fix: tell WhatsApp we're NOT past the deprecated platform cutoff
-			hookSym(image, "WAIsAfterDeprecatedPlatformCutoffDate",
+			// Key fix: tell WhatsApp we are NOT past the deprecated platform cutoff
+			tryHook(sharedModules, mainBin,
+			        "WAIsAfterDeprecatedPlatformCutoffDate",
 			        (void *)&_new_WAIsAfterDeprecatedPlatformCutoffDate,
 			        (void **)&_orig_WAIsAfterDeprecatedPlatformCutoffDate);
 
-			hookSym(image, "WADeprecatedPlatformCutOffDate",
+			tryHook(sharedModules, mainBin,
+			        "WADeprecatedPlatformCutOffDate",
 			        (void *)&_new_WADeprecatedPlatformCutOffDate,
 			        (void **)&_orig_WADeprecatedPlatformCutOffDate);
 
-			// Prevent crash when WhatsApp detects version inconsistencies
-			hookSym(image, "WAHandleFailureInFunction",
+			// Suppress internal failure handler to prevent crashes
+			tryHook(sharedModules, mainBin,
+			        "WAHandleFailureInFunction",
 			        (void *)&_new_WAHandleFailureInFunction,
 			        (void **)&_orig_WAHandleFailureInFunction);
+
+			// Version components must be consistent with WABuildVersion string
+			tryHook(sharedModules, mainBin,
+			        "WABuildVersionComponent1",
+			        (void *)&_new_WABuildVersionComponent1,
+			        (void **)&_orig_WABuildVersionComponent1);
+
+			tryHook(sharedModules, mainBin,
+			        "WABuildVersionComponent2",
+			        (void *)&_new_WABuildVersionComponent2,
+			        (void **)&_orig_WABuildVersionComponent2);
+
+			tryHook(sharedModules, mainBin,
+			        "WABuildVersionComponent3",
+			        (void *)&_new_WABuildVersionComponent3,
+			        (void **)&_orig_WABuildVersionComponent3);
+
+			tryHook(sharedModules, mainBin,
+			        "WABuildVersionComponent4",
+			        (void *)&_new_WABuildVersionComponent4,
+			        (void **)&_orig_WABuildVersionComponent4);
 
 			// WABuildHash: intentionally not hooked — spoofing the hash breaks server auth
 		}
 		else if (debugLogging)
 		{
-			NSLog(@"[Phantom] Failed to load SharedModules at: %@", frameworkPath);
+			NSLog(@"[Phantom] Failed to open any image to hook");
 		}
 
 		return;
