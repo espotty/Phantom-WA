@@ -12,12 +12,12 @@
 	<string>Set the WhatsApp version to report to servers. Tap Apply (✓) then restart WhatsApp. If a new update drops, enter the latest version number here.</string>
 	<key>PHVersionFieldLabel</key>
 	<string>Spoof Version</string>
-	<key>PHDebugLabel</key>
-	<string>Developer</string>
-	<key>PHDebugFooter</key>
-	<string>Enables detailed NSLog output for troubleshooting.</string>
-	<key>PHDebugSwitch</key>
-	<string>Debug Logging</string>
+	<key>PHFixesLabel</key>
+	<string>Fixes</string>
+	<key>PHFixesFooter</key>
+	<string>Forces WhatsApp to show notifications for all incoming messages, even when the app is in the background. Helps fix messages arriving silently.</string>
+	<key>PHFixNotifSwitch</key>
+	<string>Fix Message Notifications</string>
 	<key>PHContactLabel</key>
 	<string>Contact</string>
 	<key>PHChannelTitle</key>

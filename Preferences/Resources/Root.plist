@@ -53,14 +53,14 @@
 			<string>e.g. 25.1.83.0</string>
 		</dict>
 
-		<!-- ── Debug ── -->
+		<!-- ── Fixes ── -->
 		<dict>
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>label</key>
-			<string>PHDebugLabel</string>
+			<string>PHFixesLabel</string>
 			<key>footerText</key>
-			<string>PHDebugFooter</string>
+			<string>PHFixesFooter</string>
 		</dict>
 		<dict>
 			<key>cell</key>
@@ -68,13 +68,13 @@
 			<key>cellClass</key>
 			<string>MTTintedSwitchCell</string>
 			<key>default</key>
-			<false/>
+			<true/>
 			<key>defaults</key>
 			<string>com.macthemes.phantomprefs</string>
 			<key>key</key>
-			<string>debugLogging</string>
+			<string>fixNotifications</string>
 			<key>label</key>
-			<string>PHDebugSwitch</string>
+			<string>PHFixNotifSwitch</string>
 		</dict>
 
 		<!-- ── Contact ── -->

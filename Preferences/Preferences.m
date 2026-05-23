@@ -65,6 +65,8 @@
 	{
 		[super viewDidLoad];
 
+		self.navigationItem.rightBarButtonItem = self.applyButtonItem;
+
 		UITapGestureRecognizer *tapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget: self action: @selector(dismissKeyboard)];
 
 		[self.view addGestureRecognizer: tapGestureRecognizer];

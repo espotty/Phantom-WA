@@ -19,6 +19,7 @@ NSDictionary *preferences;
 */
 BOOL enabled;
 BOOL debugLogging;
+BOOL fixNotifications;
 
 int newVersionMajor;
 int newVersionMinor;
@@ -142,7 +143,7 @@ static NSDate *_new_WADeprecatedPlatformCutOffDate()
 /*
 	Hooks …
 */
-%group Axolotl
+%group Phantom
 
 	%hook WALogWriter
 
@@ -164,7 +165,7 @@ static NSDate *_new_WADeprecatedPlatformCutOffDate()
 
 		- (bool)needsLocalNotification
 		{
-			return true;
+			return fixNotifications ? true : %orig;
 		}
 
 	%end
@@ -256,6 +257,7 @@ static NSDate *_new_WADeprecatedPlatformCutOffDate()
 		// Now let's get the Preferences for Debug Logging and the new Version …
 
 		debugLogging = preferences[@"debugLogging"] ? [preferences[@"debugLogging"] boolValue] : NO;
+		fixNotifications = preferences[@"fixNotifications"] ? [preferences[@"fixNotifications"] boolValue] : YES;
 		newVersion = preferences[@"newVersion"] ? [preferences[@"newVersion"] stringValue] : DEFAULT_VERSION;
 
 		// Check, if the Version is valid …
