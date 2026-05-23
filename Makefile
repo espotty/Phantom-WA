@@ -4,11 +4,11 @@ FINALPACKAGE = 1
 
 ifeq ($(ROOTLESS),1)
 TARGET := iphone:clang:latest:14.0
-ARCHS = arm64 arm64e
+ARCHS = arm64
 $(TWEAK_NAME)_BUNDLE_IDENTIFIER = com.macthemes.phantom~rootless
 else
-TARGET := iphone:clang:latest:11.0
-ARCHS = arm64 arm64e
+TARGET := iphone:clang:latest:14.0
+ARCHS = arm64
 $(TWEAK_NAME)_BUNDLE_IDENTIFIER = com.macthemes.phantom
 endif
 
