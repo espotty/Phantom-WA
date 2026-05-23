@@ -17,6 +17,7 @@ include $(THEOS)/makefiles/common.mk
 TWEAK_NAME = Phantom
 Phantom_FILES = Tweak.xm WAGOTHook.mm
 Phantom_CFLAGS = -fobjc-arc -std=c++11 -Wno-deprecated-declarations
+Phantom_LDFLAGS = -Wl,-no_fixup_chains -Wl,-no_data_const
 
 include $(THEOS)/makefiles/tweak.mk
 
