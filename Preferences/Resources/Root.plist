@@ -68,7 +68,7 @@
 			<key>cellClass</key>
 			<string>MTTintedSwitchCell</string>
 			<key>default</key>
-			<true/>
+			<false/>
 			<key>defaults</key>
 			<string>com.macthemes.phantomprefs</string>
 			<key>key</key>

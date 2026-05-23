@@ -257,18 +257,23 @@ static NSDate *_new_WADeprecatedPlatformCutOffDate()
 		// Now let's get the Preferences for Debug Logging and the new Version …
 
 		debugLogging = preferences[@"debugLogging"] ? [preferences[@"debugLogging"] boolValue] : NO;
-		fixNotifications = preferences[@"fixNotifications"] ? [preferences[@"fixNotifications"] boolValue] : YES;
-		newVersion = preferences[@"newVersion"] ? [preferences[@"newVersion"] stringValue] : DEFAULT_VERSION;
+		fixNotifications = preferences[@"fixNotifications"] ? [preferences[@"fixNotifications"] boolValue] : NO;
+
+		// Use user-set version, or fall back to actual installed WhatsApp version
+		NSString *actualVersion = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"];
+		NSString *fallbackVersion = (actualVersion && actualVersion.length > 0) ? actualVersion : DEFAULT_VERSION;
+
+		newVersion = preferences[@"newVersion"] ? [preferences[@"newVersion"] stringValue] : fallbackVersion;
 
 		// Check, if the Version is valid …
 
 		NSPredicate *isValidVersion = [NSPredicate predicateWithFormat: @"SELF MATCHES %@", @"^\\d+(\\.\\d+){2,3}$"];
 
-		// … and if not, use our Default Version.
+		// … and if not, use the actual installed version.
 
 		if (![isValidVersion evaluateWithObject: newVersion])
 		{
-			newVersion = DEFAULT_VERSION;
+			newVersion = fallbackVersion;
 		}
 
 		// Separate the Version by it's Point and get the Components …
