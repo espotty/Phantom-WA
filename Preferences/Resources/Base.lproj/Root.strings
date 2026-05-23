@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>AXDebugFooter</key>
+	<string>Enable logging of status messages with NSLog.</string>
+	<key>AXDebugLabel</key>
+	<string>Debug Logging</string>
+	<key>AXDebugSwitch</key>
+	<string>Debug Logging</string>
+	<key>AXEnableLabel</key>
+	<string>Enable</string>
+	<key>AXEnableSwitch</key>
+	<string>Enable Phantom</string>
+	<key>AXSocialLabel</key>
+	<string>Links</string>
+	<key>AXVersionFooter</key>
+	<string>Set the WhatsApp version to spoof. The MD5 build hash will be calculated automatically when WhatsApp restarts after applying.</string>
+	<key>AXVersionLabel</key>
+	<string>Spoof Version</string>
+</dict>
+</plist>
