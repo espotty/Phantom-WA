@@ -6,7 +6,7 @@
 
 #include <CydiaSubstrate/CydiaSubstrate.h>
 
-#define DEFAULT_VERSION @"25.1.83.0";
+#define DEFAULT_VERSION @"25.1.83.0"
 
 /*
 	Preferences …
@@ -19,6 +19,7 @@ NSDictionary *preferences;
 BOOL enabled;
 BOOL debugLogging;
 BOOL fixNotifications;
+BOOL versionSpoofActive;
 
 int newVersionMajor;
 int newVersionMinor;
@@ -47,8 +48,6 @@ static NSDate *_new_WAAppExpirationDate()
 		NSLog(@"Original expiration date: %@", originalDate);
 	}
 
-	// Modify the Date or do whatever you want here …
-
 	return [NSDate dateWithTimeIntervalSinceNow: 31536000];
 }
 
@@ -63,11 +62,8 @@ static NSDate *_new_WABuildDate()
 		NSLog(@"Original build date: %@", originalDate);
 	}
 
-	// Modify the Date or do whatever you want here …
-
 	return [NSDate date];
 }
-
 
 static NSString *_new_WABuildVersion(void *arg1, void *arg2)
 {
@@ -79,8 +75,6 @@ static NSString *_new_WABuildVersion(void *arg1, void *arg2)
 
 		NSLog(@"Original build version: %@", originalVersion);
 	}
-
-	// Modify the Version or do whatever you want here …
 
 	return newVersion;
 }
@@ -95,8 +89,6 @@ static NSDate *_new_WADeprecatedPlatformCutOffDate()
 
 		NSLog(@"Original expiration date: %@", originalDate);
 	}
-
-	// Modify the Date or do whatever you want here …
 
 	return [NSDate dateWithTimeIntervalSinceNow: 31536000];
 }
@@ -131,37 +123,31 @@ static NSDate *_new_WADeprecatedPlatformCutOffDate()
 
 	%end
 
+	// Only overrides version proto fields when user has explicitly set a custom version.
+	// Without this guard, WhatsApp sends inconsistent version data that breaks server auth.
 	%hook WAPBClientPayload_UserAgent_AppVersion
 
 		- (void)setPrimary: (int)i
 		{
-			%orig(newVersionMajor);
+			versionSpoofActive ? %orig(newVersionMajor) : %orig(i);
 		}
 
 		- (void)setSecondary: (int)i
 		{
-			%orig(newVersionMinor);
+			versionSpoofActive ? %orig(newVersionMinor) : %orig(i);
 		}
 
 		- (void)setTertiary: (int)i
 		{
-			%orig(newVersionBuild);
+			versionSpoofActive ? %orig(newVersionBuild) : %orig(i);
 		}
 
 		- (void)setQuaternary: (int)i
 		{
-			%orig(newVersionRevision);
+			versionSpoofActive ? %orig(newVersionRevision) : %orig(i);
 		}
 
 	%end
-
-	/*
-		WACreateUserAgent
-		WASubmitMessageSendEvent
-		WAChatServers
-		WAStreamVersion
-		WACreateClientPayload
-	*/
 
 	%hook WARootViewController
 
@@ -203,85 +189,59 @@ static NSDate *_new_WADeprecatedPlatformCutOffDate()
 */
 %ctor
 {
-	// Load Preferences …
-
 	preferences = [NSDictionary dictionaryWithContentsOfFile: ROOT_PATH_NS(@"/var/mobile/Library/Preferences/com.macthemes.phantomprefs.plist")];
-
-	// … and parse only the "enabled" Preference.
 
 	enabled = preferences[@"enabled"] ? [preferences[@"enabled"] boolValue] : YES;
 
-	// Let's check, if the Tweak is enabled and initialize them …
-
 	if (enabled)
 	{
-		// Now let's get the Preferences for Debug Logging and the new Version …
-
 		debugLogging = preferences[@"debugLogging"] ? [preferences[@"debugLogging"] boolValue] : NO;
 		fixNotifications = preferences[@"fixNotifications"] ? [preferences[@"fixNotifications"] boolValue] : NO;
 
-		// Use user-set version, or fall back to actual installed WhatsApp version
-		NSString *actualVersion = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"];
-		NSString *fallbackVersion = (actualVersion && actualVersion.length > 0) ? actualVersion : DEFAULT_VERSION;
-
-		newVersion = preferences[@"newVersion"] ? [preferences[@"newVersion"] stringValue] : fallbackVersion;
-
-		// Check, if the Version is valid …
+		// Version spoof is only active when the user has explicitly saved a version in Settings.
+		// Defaulting to the installed version would still cause proto mismatches; skipping is safer.
+		NSString *userVersion = preferences[@"newVersion"] ? [preferences[@"newVersion"] stringValue] : nil;
 
 		NSPredicate *isValidVersion = [NSPredicate predicateWithFormat: @"SELF MATCHES %@", @"^\\d+(\\.\\d+){2,3}$"];
 
-		// … and if not, use the actual installed version.
-
-		if (![isValidVersion evaluateWithObject: newVersion])
+		if (userVersion && [isValidVersion evaluateWithObject: userVersion])
 		{
-			newVersion = fallbackVersion;
+			newVersion = userVersion;
+			versionSpoofActive = YES;
+		}
+		else
+		{
+			versionSpoofActive = NO;
 		}
 
-		// Separate the Version by it's Point and get the Components …
+		if (versionSpoofActive)
+		{
+			NSArray *components = [newVersion componentsSeparatedByString: @"."];
 
-		NSArray *components = [newVersion componentsSeparatedByString: @"."];
-
-		// … and set the Variables.
-
-		newVersionMajor = [components[0] intValue];
-		newVersionMinor = [components[1] intValue];
-		newVersionBuild = [components[2] intValue];
-		newVersionRevision = ([components count] > 3) ? [components[3] intValue] : 0;
-
-		// Get SharedModules-Framework …
+			newVersionMajor = [components[0] intValue];
+			newVersionMinor = [components[1] intValue];
+			newVersionBuild = [components[2] intValue];
+			newVersionRevision = ([components count] > 3) ? [components[3] intValue] : 0;
+		}
 
 		NSString *bundlePath = [[NSBundle mainBundle] bundlePath];
 		NSString *frameworkPath = [bundlePath stringByAppendingPathComponent: @"Frameworks/SharedModules.framework/SharedModules"];
 
 		void *image = dlopen([frameworkPath UTF8String], RTLD_LAZY);
 
-		// Initialize the Tweak …
-
 		%init(Phantom);
-
-		// If we have a valid Image …
 
 		if (image)
 		{
-			// Get Build Date and change it to our new Date …
-
 			void * _WAAppExpirationDate = dlsym(image, "WAAppExpirationDate");
 
 			if (_WAAppExpirationDate)
 			{
-				// Check, if Debug Logging is requested …
-
 				if (debugLogging)
 				{
-					// Cast the Void Pointer to a Function Pointer and call it …
-
 					NSDate * (*func)() = (NSDate *(*)())_WAAppExpirationDate;
-					NSDate *result = func();
-
-					NSLog(@"Function result: %@", result);
+					NSLog(@"WAAppExpirationDate result: %@", func());
 				}
-
-				// Replace the original Function by our new One with different Expiration Date …
 
 				MSHookFunction(_WAAppExpirationDate, (void *)&_new_WAAppExpirationDate, (void **)&_orig_WAAppExpirationDate);
 			}
@@ -290,25 +250,15 @@ static NSDate *_new_WADeprecatedPlatformCutOffDate()
 				NSLog(@"Failed to find WAAppExpirationDate");
 			}
 
-			// Get Build Date and change it to our new Date …
-
 			void * _WABuildDate = dlsym(image, "WABuildDate");
 
 			if (_WABuildDate)
 			{
-				// Check, if Debug Logging is requested …
-
 				if (debugLogging)
 				{
-					// Cast the Void Pointer to a Function Pointer and call it …
-
 					NSDate * (*func)() = (NSDate *(*)())_WABuildDate;
-					NSDate *result = func();
-
-					NSLog(@"Function result: %@", result);
+					NSLog(@"WABuildDate result: %@", func());
 				}
-
-				// Replace the original Function by our new One with different Build Date …
 
 				MSHookFunction(_WABuildDate, (void *)&_new_WABuildDate, (void **)&_orig_WABuildDate);
 			}
@@ -317,54 +267,37 @@ static NSDate *_new_WADeprecatedPlatformCutOffDate()
 				NSLog(@"Failed to find WABuildDate");
 			}
 
-			// Get the Build Version and change it to our new Version …
-
-			void * _WABuildVersion = dlsym(image, "WABuildVersion");
-
-			if (_WABuildVersion)
+			// Only hook WABuildVersion when version spoof is active
+			if (versionSpoofActive)
 			{
-				// Check, if Debug Logging is requested …
+				void * _WABuildVersion = dlsym(image, "WABuildVersion");
 
-				if (debugLogging)
+				if (_WABuildVersion)
 				{
-					// Cast the Void Pointer to a Function Pointer and call it …
+					if (debugLogging)
+					{
+						NSString * (*func)(void *, void *) = (NSString *(*)(void *, void *))_WABuildVersion;
+						NSLog(@"WABuildVersion result: %@", func((void*)@"", (void*)@""));
+					}
 
-					NSString * (*func)(void *, void *) = (NSString *(*)(void *, void *))_WABuildVersion;
-
-					// Pass NULL for the Arguments if you don't know what to pass …
-
-					NSString *result = func((void*)@"", (void*)@"");
-
-					NSLog(@"Function result: %@", result);
+					MSHookFunction(_WABuildVersion, (void *)&_new_WABuildVersion, (void **)&_orig_WABuildVersion);
 				}
-
-				// Replace the original Function by our new One with different Build Version …
-
-				MSHookFunction(_WABuildVersion, (void *)&_new_WABuildVersion, (void **)&_orig_WABuildVersion);
-			}
-			else if (debugLogging)
-			{
-				NSLog(@"Failed to find WABuildVersion");
+				else if (debugLogging)
+				{
+					NSLog(@"Failed to find WABuildVersion");
+				}
 			}
 
 			// WABuildHash: intentionally not hooked — spoofing the hash breaks server auth
-
-			// Get Deprecated Platform Cut-Off Date and change it to our new Date …
 
 			void *_WADeprecatedPlatformCutOffDate = dlsym(image, "_WADeprecatedPlatformCutOffDate");
 
 			if (_WADeprecatedPlatformCutOffDate)
 			{
-				// Check, if Debug Logging is requested …
-
 				if (debugLogging)
 				{
-					// Cast the Void Pointer to a Function Pointer and call it …
-
 					NSDate * (*func)() = (NSDate *(*)())_WADeprecatedPlatformCutOffDate;
-					NSDate *result = func();
-
-					NSLog(@"Function result: %@", result);
+					NSLog(@"WADeprecatedPlatformCutOffDate result: %@", func());
 				}
 
 				MSHookFunction(_WADeprecatedPlatformCutOffDate, (void *)&_new_WADeprecatedPlatformCutOffDate, (void **)&_orig_WADeprecatedPlatformCutOffDate);
