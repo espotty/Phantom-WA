@@ -291,7 +291,7 @@ static NSDate *_new_WADeprecatedPlatformCutOffDate()
 
 		// Initialize the Tweak …
 
-		%init(Axolotl);
+		%init(Phantom);
 
 		// If we have a valid Image …
 
