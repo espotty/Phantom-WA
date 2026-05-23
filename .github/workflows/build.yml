@@ -13,11 +13,13 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Theos
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           export THEOS=~/theos
           bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
 
-      - name: Build DEB
+      - name: Build DEB (Rootful)
         run: |
           export THEOS=~/theos
           export PATH=$THEOS/bin:$PATH
