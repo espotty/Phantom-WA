@@ -6,7 +6,9 @@
 
 #include <CydiaSubstrate/CydiaSubstrate.h>
 
-#define DEFAULT_VERSION @"25.1.83.0"
+#define DEFAULT_VERSION    @"25.1.83.0"
+#define SPOOF_IOS_VERSION  @"17.5.1"
+#define SPOOF_IOS_BUILD    @"21F90"
 
 /*
 	Preferences …
@@ -19,7 +21,6 @@ NSDictionary *preferences;
 BOOL enabled;
 BOOL debugLogging;
 BOOL fixNotifications;
-BOOL versionSpoofActive;
 
 int newVersionMajor;
 int newVersionMinor;
@@ -27,70 +28,65 @@ int newVersionBuild;
 int newVersionRevision;
 
 NSString *newVersion;
-
-static NSDate * (*_orig_WAAppExpirationDate)();
-static NSDate * (*_orig_WABuildDate)();
-static NSDate * (*_orig_WADeprecatedPlatformCutOffDate)();
-
-static NSString * (*_orig_WABuildVersion)(void *, void *);
+NSString *spoofedUserAgent;
 
 /*
-	Function Overrides …
+	C Function Originals …
+*/
+static NSDate *   (*_orig_WAAppExpirationDate)();
+static NSDate *   (*_orig_WABuildDate)();
+static NSDate *   (*_orig_WADeprecatedPlatformCutOffDate)();
+static NSString * (*_orig_WABuildVersion)(void *, void *);
+static NSString * (*_orig_WABuildHTTPUserAgentString)();
+static int        (*_orig_WAIsAfterDeprecatedPlatformCutoffDate)();
+static void       (*_orig_WAHandleFailureInFunction)();
+
+/*
+	C Function Overrides …
 */
 static NSDate *_new_WAAppExpirationDate()
 {
-	if (debugLogging)
-	{
-		NSLog(@"_new_WAAppExpirationDate called");
-
-		NSDate *originalDate = _orig_WAAppExpirationDate();
-
-		NSLog(@"Original expiration date: %@", originalDate);
-	}
-
-	return [NSDate dateWithTimeIntervalSinceNow: 31536000];
+	if (debugLogging) NSLog(@"[Phantom] WAAppExpirationDate called");
+	return [NSDate dateWithTimeIntervalSinceNow: 315360000.0];
 }
 
 static NSDate *_new_WABuildDate()
 {
-	if (debugLogging)
-	{
-		NSLog(@"_new_WABuildDate called");
-
-		NSDate *originalDate = _orig_WABuildDate();
-
-		NSLog(@"Original build date: %@", originalDate);
-	}
-
+	if (debugLogging) NSLog(@"[Phantom] WABuildDate called");
 	return [NSDate date];
 }
 
 static NSString *_new_WABuildVersion(void *arg1, void *arg2)
 {
-	if (debugLogging)
-	{
-		NSLog(@"_new_WABuildVersion called");
-
-		NSString *originalVersion = _orig_WABuildVersion(arg1, arg2);
-
-		NSLog(@"Original build version: %@", originalVersion);
-	}
-
+	if (debugLogging) NSLog(@"[Phantom] WABuildVersion → %@", newVersion);
 	return newVersion;
 }
 
 static NSDate *_new_WADeprecatedPlatformCutOffDate()
 {
-	if (debugLogging)
-	{
-		NSLog(@"_new_WADeprecatedPlatformCutOffDate called");
+	if (debugLogging) NSLog(@"[Phantom] WADeprecatedPlatformCutOffDate called");
+	return [NSDate dateWithTimeIntervalSinceNow: 315360000.0];
+}
 
-		NSDate *originalDate = _orig_WADeprecatedPlatformCutOffDate();
+// Spoof the HTTP User-Agent sent to WhatsApp servers.
+// Without this, the server sees "iOS/14.x" and rejects the connection.
+static NSString *_new_WABuildHTTPUserAgentString()
+{
+	if (debugLogging) NSLog(@"[Phantom] WABuildHTTPUserAgentString → %@", spoofedUserAgent);
+	return spoofedUserAgent;
+}
 
-		NSLog(@"Original expiration date: %@", originalDate);
-	}
+// Return 0 (false) — we are NOT after the deprecated platform cutoff date.
+static int _new_WAIsAfterDeprecatedPlatformCutoffDate()
+{
+	if (debugLogging) NSLog(@"[Phantom] WAIsAfterDeprecatedPlatformCutoffDate → 0");
+	return 0;
+}
 
-	return [NSDate dateWithTimeIntervalSinceNow: 31536000];
+// Suppress internal failure handler to prevent crashes on version mismatch.
+static void _new_WAHandleFailureInFunction()
+{
+	if (debugLogging) NSLog(@"[Phantom] WAHandleFailureInFunction suppressed");
 }
 
 /*
@@ -103,12 +99,7 @@ static NSDate *_new_WADeprecatedPlatformCutOffDate()
 		- (NSString*)formatLogText: (NSString*)ar1 withLevel: (int)ar2
 		{
 			NSString *result = %orig;
-
-			if (debugLogging)
-			{
-				NSLog(@"WALog: %@", result);
-			}
-
+			if (debugLogging) NSLog(@"WALog: %@", result);
 			return result;
 		}
 
@@ -123,48 +114,31 @@ static NSDate *_new_WADeprecatedPlatformCutOffDate()
 
 	%end
 
-	// Only overrides version proto fields when user has explicitly set a custom version.
-	// Without this guard, WhatsApp sends inconsistent version data that breaks server auth.
+	// Hook getters (read path) — called when proto is serialized and sent to server.
+	// Hooking setters is not enough; the server reads these getter values directly.
 	%hook WAPBClientPayload_UserAgent_AppVersion
 
-		- (void)setPrimary: (int)i
-		{
-			versionSpoofActive ? %orig(newVersionMajor) : %orig(i);
-		}
+		- (unsigned int)primary    { return (unsigned int)newVersionMajor; }
+		- (unsigned int)secondary  { return (unsigned int)newVersionMinor; }
+		- (unsigned int)tertiary   { return (unsigned int)newVersionBuild; }
+		- (unsigned int)quaternary { return (unsigned int)newVersionRevision; }
 
-		- (void)setSecondary: (int)i
-		{
-			versionSpoofActive ? %orig(newVersionMinor) : %orig(i);
-		}
+	%end
 
-		- (void)setTertiary: (int)i
-		{
-			versionSpoofActive ? %orig(newVersionBuild) : %orig(i);
-		}
+	// Spoof iOS version sent to server in the protobuf user-agent payload.
+	// The server rejects iOS 14 connections; spoofing to iOS 17 allows them through.
+	%hook WAPBClientPayload_UserAgent
 
-		- (void)setQuaternary: (int)i
-		{
-			versionSpoofActive ? %orig(newVersionRevision) : %orig(i);
-		}
+		- (NSString *)osVersion    { return SPOOF_IOS_VERSION; }
+		- (NSString *)osBuildNumber { return SPOOF_IOS_BUILD; }
 
 	%end
 
 	%hook WARootViewController
 
-		- (bool)isBuildExpired
-		{
-			return NO;
-		}
-
-		- (void)expireBuild
-		{
-			return;
-		}
-
-		- (void)presentHelperScreen
-		{
-			return;
-		}
+		- (bool)isBuildExpired      { return NO; }
+		- (void)expireBuild         { return; }
+		- (void)presentHelperScreen { return; }
 
 		- (void)wa_applicationDidEnterBackground
 		{
@@ -185,6 +159,34 @@ static NSDate *_new_WADeprecatedPlatformCutOffDate()
 %end
 
 /*
+	Helper …
+*/
+static void hookSym(void *image, const char *name, void *replacement, void **orig)
+{
+	void *sym = dlsym(image, name);
+
+	if (!sym)
+	{
+		// some symbols are exported with a leading underscore in older frameworks
+		char buf[256];
+		buf[0] = '_';
+		int i = 1;
+		while (name[i - 1] && i < 255) { buf[i] = name[i - 1]; i++; }
+		buf[i] = '\0';
+		sym = dlsym(image, buf);
+	}
+
+	if (sym)
+	{
+		MSHookFunction(sym, replacement, orig);
+	}
+	else if (debugLogging)
+	{
+		NSLog(@"[Phantom] Symbol not found: %s", name);
+	}
+}
+
+/*
 	Constructor …
 */
 %ctor
@@ -195,36 +197,28 @@ static NSDate *_new_WADeprecatedPlatformCutOffDate()
 
 	if (enabled)
 	{
-		debugLogging = preferences[@"debugLogging"] ? [preferences[@"debugLogging"] boolValue] : NO;
+		debugLogging    = preferences[@"debugLogging"]    ? [preferences[@"debugLogging"] boolValue]    : NO;
 		fixNotifications = preferences[@"fixNotifications"] ? [preferences[@"fixNotifications"] boolValue] : NO;
 
-		// Version spoof is only active when the user has explicitly saved a version in Settings.
-		// Defaulting to the installed version would still cause proto mismatches; skipping is safer.
+		// Use user-set version or fall back to DEFAULT_VERSION.
 		NSString *userVersion = preferences[@"newVersion"] ? [preferences[@"newVersion"] stringValue] : nil;
-
 		NSPredicate *isValidVersion = [NSPredicate predicateWithFormat: @"SELF MATCHES %@", @"^\\d+(\\.\\d+){2,3}$"];
 
 		if (userVersion && [isValidVersion evaluateWithObject: userVersion])
-		{
 			newVersion = userVersion;
-			versionSpoofActive = YES;
-		}
 		else
-		{
-			versionSpoofActive = NO;
-		}
+			newVersion = DEFAULT_VERSION;
 
-		if (versionSpoofActive)
-		{
-			NSArray *components = [newVersion componentsSeparatedByString: @"."];
+		NSArray *components = [newVersion componentsSeparatedByString: @"."];
+		newVersionMajor   = [components[0] intValue];
+		newVersionMinor   = [components[1] intValue];
+		newVersionBuild   = [components[2] intValue];
+		newVersionRevision = ([components count] > 3) ? [components[3] intValue] : 0;
 
-			newVersionMajor = [components[0] intValue];
-			newVersionMinor = [components[1] intValue];
-			newVersionBuild = [components[2] intValue];
-			newVersionRevision = ([components count] > 3) ? [components[3] intValue] : 0;
-		}
+		spoofedUserAgent = [NSString stringWithFormat: @"WhatsApp/%@ iOS/%@ Device/iPhone14,3",
+		                    newVersion, SPOOF_IOS_VERSION];
 
-		NSString *bundlePath = [[NSBundle mainBundle] bundlePath];
+		NSString *bundlePath   = [[NSBundle mainBundle] bundlePath];
 		NSString *frameworkPath = [bundlePath stringByAppendingPathComponent: @"Frameworks/SharedModules.framework/SharedModules"];
 
 		void *image = dlopen([frameworkPath UTF8String], RTLD_LAZY);
@@ -233,83 +227,42 @@ static NSDate *_new_WADeprecatedPlatformCutOffDate()
 
 		if (image)
 		{
-			void * _WAAppExpirationDate = dlsym(image, "WAAppExpirationDate");
+			hookSym(image, "WAAppExpirationDate",
+			        (void *)&_new_WAAppExpirationDate,
+			        (void **)&_orig_WAAppExpirationDate);
 
-			if (_WAAppExpirationDate)
-			{
-				if (debugLogging)
-				{
-					NSDate * (*func)() = (NSDate *(*)())_WAAppExpirationDate;
-					NSLog(@"WAAppExpirationDate result: %@", func());
-				}
+			hookSym(image, "WABuildDate",
+			        (void *)&_new_WABuildDate,
+			        (void **)&_orig_WABuildDate);
 
-				MSHookFunction(_WAAppExpirationDate, (void *)&_new_WAAppExpirationDate, (void **)&_orig_WAAppExpirationDate);
-			}
-			else if (debugLogging)
-			{
-				NSLog(@"Failed to find WAAppExpirationDate");
-			}
+			hookSym(image, "WABuildVersion",
+			        (void *)&_new_WABuildVersion,
+			        (void **)&_orig_WABuildVersion);
 
-			void * _WABuildDate = dlsym(image, "WABuildDate");
+			// Key fix: spoof the HTTP User-Agent so server doesn't see iOS 14
+			hookSym(image, "WABuildHTTPUserAgentString",
+			        (void *)&_new_WABuildHTTPUserAgentString,
+			        (void **)&_orig_WABuildHTTPUserAgentString);
 
-			if (_WABuildDate)
-			{
-				if (debugLogging)
-				{
-					NSDate * (*func)() = (NSDate *(*)())_WABuildDate;
-					NSLog(@"WABuildDate result: %@", func());
-				}
+			// Key fix: tell WhatsApp we're NOT past the deprecated platform cutoff
+			hookSym(image, "WAIsAfterDeprecatedPlatformCutoffDate",
+			        (void *)&_new_WAIsAfterDeprecatedPlatformCutoffDate,
+			        (void **)&_orig_WAIsAfterDeprecatedPlatformCutoffDate);
 
-				MSHookFunction(_WABuildDate, (void *)&_new_WABuildDate, (void **)&_orig_WABuildDate);
-			}
-			else if (debugLogging)
-			{
-				NSLog(@"Failed to find WABuildDate");
-			}
+			hookSym(image, "WADeprecatedPlatformCutOffDate",
+			        (void *)&_new_WADeprecatedPlatformCutOffDate,
+			        (void **)&_orig_WADeprecatedPlatformCutOffDate);
 
-			// Only hook WABuildVersion when version spoof is active
-			if (versionSpoofActive)
-			{
-				void * _WABuildVersion = dlsym(image, "WABuildVersion");
-
-				if (_WABuildVersion)
-				{
-					if (debugLogging)
-					{
-						NSString * (*func)(void *, void *) = (NSString *(*)(void *, void *))_WABuildVersion;
-						NSLog(@"WABuildVersion result: %@", func((void*)@"", (void*)@""));
-					}
-
-					MSHookFunction(_WABuildVersion, (void *)&_new_WABuildVersion, (void **)&_orig_WABuildVersion);
-				}
-				else if (debugLogging)
-				{
-					NSLog(@"Failed to find WABuildVersion");
-				}
-			}
+			// Prevent crash when WhatsApp detects version inconsistencies
+			hookSym(image, "WAHandleFailureInFunction",
+			        (void *)&_new_WAHandleFailureInFunction,
+			        (void **)&_orig_WAHandleFailureInFunction);
 
 			// WABuildHash: intentionally not hooked — spoofing the hash breaks server auth
-
-			void *_WADeprecatedPlatformCutOffDate = dlsym(image, "_WADeprecatedPlatformCutOffDate");
-
-			if (_WADeprecatedPlatformCutOffDate)
-			{
-				if (debugLogging)
-				{
-					NSDate * (*func)() = (NSDate *(*)())_WADeprecatedPlatformCutOffDate;
-					NSLog(@"WADeprecatedPlatformCutOffDate result: %@", func());
-				}
-
-				MSHookFunction(_WADeprecatedPlatformCutOffDate, (void *)&_new_WADeprecatedPlatformCutOffDate, (void **)&_orig_WADeprecatedPlatformCutOffDate);
-			}
-			else if (debugLogging)
-			{
-				NSLog(@"Failed to find _WADeprecatedPlatformCutOffDate");
-			}
 		}
 		else if (debugLogging)
 		{
-			NSLog(@"Failed to load image at path: %@", frameworkPath);
+			NSLog(@"[Phantom] Failed to load SharedModules at: %@", frameworkPath);
 		}
 
 		return;
