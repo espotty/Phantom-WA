@@ -1,4 +1,3 @@
-#import <CommonCrypto/CommonDigest.h>
 #import <Foundation/Foundation.h>
 
 #import <rootless.h>
@@ -27,35 +26,12 @@ int newVersionBuild;
 int newVersionRevision;
 
 NSString *newVersion;
-NSString *newBuildHash;
 
 static NSDate * (*_orig_WAAppExpirationDate)();
 static NSDate * (*_orig_WABuildDate)();
 static NSDate * (*_orig_WADeprecatedPlatformCutOffDate)();
 
 static NSString * (*_orig_WABuildVersion)(void *, void *);
-static NSString * (*_orig_WABuildHash)();
-
-/*
-	Functions …
-*/
-static NSString *md5HexDigest(NSString *input)
-{
-	const char* str = [input UTF8String];
-
-	unsigned char result[CC_MD5_DIGEST_LENGTH];
-
-	CC_MD5(str, (CC_LONG)strlen(str), result);
-
-	NSMutableString *ret = [NSMutableString stringWithCapacity: CC_MD5_DIGEST_LENGTH * 2];
-
-	for(int i = 0; i < CC_MD5_DIGEST_LENGTH; i++)
-	{
-		[ret appendFormat: @"%02x", result[i]];
-	}
-
-	return ret;
-}
 
 /*
 	Function Overrides …
@@ -92,21 +68,6 @@ static NSDate *_new_WABuildDate()
 	return [NSDate date];
 }
 
-static NSString *_new_WABuildHash()
-{
-	if (debugLogging)
-	{
-		NSLog(@"_new_WABuildHash called");
-
-		NSString *originalVersion = _orig_WABuildHash();
-
-		NSLog(@"Original build hash: %@", originalVersion);
-	}
-
-	// Modify the Build Hash or do whatever you want here …
-
-	return newBuildHash;
-}
 
 static NSString *_new_WABuildVersion(void *arg1, void *arg2)
 {
