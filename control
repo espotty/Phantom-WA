@@ -1,6 +1,6 @@
 Package: com.macthemes.phantom
 Name: Phantom
-Depends: mobilesubstrate
+Depends: mobilesubstrate, preferenceloader
 Version: 1.0.1
 Architecture: iphoneos-arm
 Description: Blocks WhatsApp forced updates and spoofs version
