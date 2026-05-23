@@ -386,39 +386,7 @@ static NSDate *_new_WADeprecatedPlatformCutOffDate()
 				NSLog(@"Failed to find WABuildVersion");
 			}
 
-			// Get Build Hash and change it to our previously calculated Hash …
-
-			void * _WABuildHash = dlsym(image, "WABuildHash");
-
-			if (_WABuildHash)
-			{
-				// Let's calculate a new MD5-Hash of the Build Version, which is simply used as Build Hash …
-
-				newBuildHash = md5HexDigest(newVersion);
-
-				// Check, if Debug Logging is requested …
-
-				if (debugLogging)
-				{
-					// Cast the Void Pointer to a Function Pointer and call it …
-
-					NSString * (*func)() = (NSString *(*)())_WABuildHash;
-
-					// Pass NULL for the Arguments if you don't know what to pass …
-
-					NSString *result = func();
-
-					NSLog(@"Function result: %@", result);
-				}
-
-				// Replace the original Function by our new One with different Build Hash …
-
-				MSHookFunction(_WABuildHash, (void *)&_new_WABuildHash, (void **)&_orig_WABuildHash);
-			}
-			else if (debugLogging)
-			{
-				NSLog(@"Failed to find WABuildHash");
-			}
+			// WABuildHash: intentionally not hooked — spoofing the hash breaks server auth
 
 			// Get Deprecated Platform Cut-Off Date and change it to our new Date …
 
